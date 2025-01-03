@@ -6,7 +6,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 PORT=$((RANDOM % 22001 + 40000))
-USERNAME=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 14)
+USERNAME=$(cat /dev/urandom | tr -dc 'A-Za-z' | head -c 1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 14)
 PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 19)
 
 timedatectl set-timezone Asia/Shanghai
