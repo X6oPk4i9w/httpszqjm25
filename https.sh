@@ -30,28 +30,14 @@ fi
 
 mkdir -p /etc/caddy
 cat >/etc/caddy/https.caddyfile<<EOF
-{
-   debug
-   auto_https disable_redirects
-   servers {
-       protocols h1 h2 h2c
-       strict_sni_host
+:443, $domain
+route {
+   forward_proxy {
+       basic_auth $username $password
+       hide_ip
+       hide_via
    }
-}
-
-:443, $domain {
-   tls {
-       min_version 1.3
-       cipher_suites TLS_AES_256_GCM_SHA384
-   }
-   route {
-       forward_proxy {
-           basic_auth $username $password
-           hide_ip
-           hide_via
-       }
-       file_server
-   }
+   file_server
 }
 EOF
 
