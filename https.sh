@@ -5,10 +5,11 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-PORT=$((RANDOM % 22001 + 40000))  # 生成40000-62000之间的随机端口
+PORT=$((RANDOM % 22001 + 40000))
+USERNAME=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 14)
+PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z' | head -c 1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 19)
 
 timedatectl set-timezone Asia/Shanghai
-Passwd=$(cat /dev/urandom | head -1 | md5sum | head -c 12)
 wget https://github.com/yeahwu/image/raw/refs/heads/master/caddy.tar.gz -O - | tar -xz -C /usr/local/
 echo "====输入已经DNS解析好的域名===="
 read domain
@@ -18,7 +19,6 @@ if [ "$isPort" != "" ];then
    clear
    echo " ================================================== "
    echo " 端口 $PORT 被占用，请重新运行脚本"
-   echo
    echo " 端口占用信息如下："
    echo $isPort
    echo " ================================================== "
@@ -30,7 +30,7 @@ cat >/etc/caddy/https.caddyfile<<EOF
 :$PORT, $domain
 route {
    forward_proxy {
-       basic_auth 1024 $Passwd
+       basic_auth $USERNAME $PASSWORD
        hide_ip
        hide_via
    }
@@ -66,10 +66,10 @@ cat >/etc/caddy/https.json<<EOF
 代理模式：Https正向代理
 地址：${domain}
 端口：$PORT
-用户：1024
-密码：${Passwd}
+用户：$USERNAME
+密码：$PASSWORD
 ====================================
-http=$domain:$PORT, username=1024, password=$Passwd, over-tls=true, tls-verification=true, tls-host=$domain, udp-relay=false, tls13=true, tag=https
+http=$domain:$PORT, username=$USERNAME, password=$PASSWORD, over-tls=true, tls-verification=true, tls-host=$domain, udp-relay=false, tls13=true, tag=https
 }
 EOF
 
@@ -79,9 +79,9 @@ echo
 echo "===========Https配置参数============"
 echo
 echo "地址：${domain}"
-echo "端口：$PORT"
-echo "密码：${Passwd}"
-echo "用户：1024"
+echo "端口：$PORT" 
+echo "用户：$USERNAME"
+echo "密码：$PASSWORD"
 echo
 echo "========================================="
-echo "http=$domain:$PORT, username=1024, password=$Passwd, over-tls=true, tls-verification=true, tls-host=$domain, udp-relay=false, tls13=true, tag=https"
+echo "http=$domain:$PORT, username=$USERNAME, password=$PASSWORD, over-tls=true, tls-verification=true, tls-host=$domain, udp-relay=false, tls13=true, tag=https"
