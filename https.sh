@@ -1,28 +1,28 @@
 #!/bin/bash
 
-wget -q https://github.com/yeahwu/image/raw/refs/heads/master/caddy.tar.gz -O caddy.tar.gz
+wget -q https://github.com/yeahwu/image/raw/refs/heads/master/caddy.tar.gz
 tar -xzf caddy.tar.gz -C /usr/local/
+rm -f caddy.tar.gz
 
 PORT=$((RANDOM % 25531 + 40000))
-USERNAME=$(cat /dev/urandom | tr -dc 'A-Z' | head -c1)$(cat /dev/urandom | tr -dc 'A-Za-z0-9' | head -c14)
-PASSWORD=$(cat /dev/urandom | tr -dc 'a-z' | head -c1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c19)
+USERNAME=$(head /dev/urandom | tr -dc 'A-Z' | head -c1)$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c14)
+PASSWORD=$(head /dev/urandom | tr -dc 'a-z' | head -c1)$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c19)
 
-read -p "请输入域名: " domain
+read -p "域名: " domain
 
-mkdir -p /etc/caddy
 cat >/etc/caddy/https.caddyfile <<EOF
-:$PORT, \$domain {
-    tls {
-        protocols tls1.3
-    }
-    route {
-        forward_proxy {
-            basic_auth \$USERNAME \$PASSWORD
-            hide_ip
-            hide_via
-        }
-        file_server
-    }
+:$PORT, $domain {
+   tls {
+       protocols tls1.3
+   }
+   route {
+       forward_proxy {
+           basic_auth $USERNAME $PASSWORD
+           hide_ip
+           hide_via
+       }
+       file_server
+   }
 }
 EOF
 
