@@ -30,14 +30,19 @@ fi
 
 mkdir -p /etc/caddy
 cat >/etc/caddy/https.caddyfile<<EOF
-:443, $domain
-route {
-   forward_proxy {
-       basic_auth $username $password
-       hide_ip
-       hide_via
+:443, $domain {
+   tls {
+       ciphers TLS_AES_256_GCM_SHA384
+       curves x25519 secp384r1
    }
-   file_server
+   route {
+       forward_proxy {
+           basic_auth $username $password
+           hide_ip
+           hide_via
+       }
+       file_server
+   }
 }
 EOF
 
