@@ -1,47 +1,63 @@
-#!/bin/sh
-# forum: https://1024.day
+#!/bin/bash
 
-if [[ $EUID -ne 0 ]]; then
-    clear
-    echo "Error: This script must be run as root!" 1>&2
-    exit 1
-fi
+check_root() {
+   if [[ $EUID -ne 0 ]]; then
+       echo "错误: 请使用 root 权限运行此脚本" >&2
+       exit 1
+   }
+}
 
-timedatectl set-timezone Asia/Shanghai
-Passwd=$(cat /dev/urandom | head -1 | md5sum | head -c 12)
+generate_credentials() {
+   # 生成随机端口 (40000-65530)
+   PORT=$((RANDOM % 25531 + 40000))
+   
+   # 生成用户名 (大写字母开头,15位)
+   USERNAME=$(cat /dev/urandom | tr -dc 'A-Z' | head -c1)$(cat /dev/urandom | tr -dc 'A-Za-z0-9' | head -c14)
+   
+   # 生成密码 (小写字母开头,20位) 
+   PASSWORD=$(cat /dev/urandom | tr -dc 'a-z' | head -c1)$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c19)
+}
 
-wget https://github.com/yeahwu/image/raw/refs/heads/master/caddy.tar.gz -O - | tar -xz -C /usr/local/
+check_port() {
+   if netstat -ntlp | grep -q ":$PORT "; then
+       echo "错误: 端口 $PORT 被占用"
+       exit 1
+   }
+}
 
-echo "====输入已经DNS解析好的域名===="
-read domain
+install_caddy() {
+   local temp_file=$(mktemp)
+   if ! wget -q https://github.com/yeahwu/image/raw/refs/heads/master/caddy.tar.gz -O "$temp_file"; then
+       echo "错误: 下载 Caddy 失败"
+       rm -f "$temp_file"
+       exit 1
+   }
+   tar -xzf "$temp_file" -C /usr/local/
+   rm -f "$temp_file"
+}
 
-    isPort=`netstat -ntlp| grep -E ':80 |:443 '`
-    if [ "$isPort" != "" ];then
-        clear
-        echo " ================================================== "
-        echo " 80或443端口被占用，请先释放端口再运行此脚本"
-        echo
-        echo " 端口占用信息如下："
-        echo $isPort
-        echo " ================================================== "
-        exit 1
-    fi
-
-mkdir -p /etc/caddy
-
-cat >/etc/caddy/https.caddyfile<<EOF
-:443, $domain
-route {
-	forward_proxy {
-		basic_auth 1024 $Passwd
-		hide_ip
-		hide_via
-	}
-	file_server
+setup_config() {
+   local domain="$1"
+   mkdir -p /etc/caddy
+   
+   cat > /etc/caddy/https.caddyfile << EOF
+:$PORT, $domain
+{
+   tls {
+       protocols tls1.3
+   }
+   route {
+       forward_proxy {
+           basic_auth $USERNAME $PASSWORD
+           hide_ip
+           hide_via
+       }
+       file_server
+   }
 }
 EOF
 
-cat >/etc/systemd/system/caddy.service<<EOF
+   cat > /etc/systemd/system/caddy.service << EOF
 [Unit]
 Description=Caddy
 Documentation=https://caddyserver.com/docs/
@@ -61,33 +77,48 @@ AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE
 [Install]
 WantedBy=multi-user.target
 EOF
-
-systemctl enable caddy.service && systemctl restart caddy.service && systemctl status --no-pager caddy.service
-rm -f https.sh
-
-cat >/etc/caddy/https.json<<EOF
-{
-===========配置参数=============
-代理模式：Https正向代理
-地址：${domain}
-端口：443
-用户：1024
-密码：${Passwd}
-====================================
-http=$domain:443, username=1024, password=$Passwd, over-tls=true, tls-verification=true, tls-host=$domain, udp-relay=false, tls13=true, tag=https
 }
-EOF
 
-    echo
-    echo "安装已经完成"
-    echo
-    echo "===========Https配置参数============"
-    echo
-    echo "地址：${domain}"
-    echo "端口：443"
-    echo "密码：${Passwd}"
-    echo "用户：1024"
-    echo
-    echo "========================================="
-    echo "http=$domain:443, username=1024, password=$Passwd, over-tls=true, tls-verification=true, tls-host=$domain, udp-relay=false, tls13=true, tag=https"
-    echo
+print_config() {
+   local domain="$1"
+   
+   cat << EOF
+=============== 配置信息 ===============
+代理类型: HTTPS 正向代理
+域名: ${domain}
+端口: ${PORT}
+用户名: ${USERNAME}
+密码: ${PASSWORD}
+TLS版本: 1.3
+=======================================
+
+配置字符串:
+http=${domain}:${PORT}, username=${USERNAME}, password=${PASSWORD}, over-tls=true, tls-verification=true, tls-host=${domain}, udp-relay=false, tls13=true, tag=https
+EOF
+}
+
+main() {
+   check_root
+   generate_credentials
+   check_port
+   
+   timedatectl set-timezone Asia/Shanghai
+   
+   read -p "请输入已解析的域名: " domain
+   if [ -z "$domain" ]; then
+       echo "错误: 域名不能为空"
+       exit 1
+   }
+   
+   install_caddy
+   setup_config "$domain"
+   
+   if ! systemctl enable caddy.service && systemctl restart caddy.service; then
+       echo "错误: Caddy 服务启动失败"
+       exit 1
+   }
+   
+   print_config "$domain"
+}
+
+main "$@"
